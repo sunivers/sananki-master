@@ -1,6 +1,6 @@
 -- Create cards table
 CREATE TABLE IF NOT EXISTS cards (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id BIGSERIAL PRIMARY KEY,
   category TEXT NOT NULL,
   question TEXT NOT NULL,
   answer TEXT NOT NULL,
@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS cards (
 
 -- Create card_progress table
 CREATE TABLE IF NOT EXISTS card_progress (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  card_id UUID REFERENCES cards(id) ON DELETE CASCADE,
+  id BIGSERIAL PRIMARY KEY,
+  card_id BIGINT REFERENCES cards(id) ON DELETE CASCADE,
   correct_streak INTEGER DEFAULT 0,
   last_result TEXT CHECK (last_result IN ('correct', 'incorrect')),
   last_studied_at TIMESTAMP WITH TIME ZONE,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS card_progress (
 
 -- Create daily_sessions table
 CREATE TABLE IF NOT EXISTS daily_sessions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id BIGSERIAL PRIMARY KEY,
   date DATE NOT NULL DEFAULT CURRENT_DATE,
   total_cards INTEGER DEFAULT 0,
   completed_cards INTEGER DEFAULT 0,
