@@ -1,8 +1,7 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { Card } from '@/types';
-import { checkAnswer, checkBlankAnswer } from '@/lib/utils/answer-check';
+import { useReducer, useEffect, useRef } from "react";
+import { Card } from "@/types";
 
 interface CardStudyProps {
   card: Card;
@@ -11,73 +10,74 @@ interface CardStudyProps {
   showAnswer?: boolean;
 }
 
-export default function CardStudy({ card, onAnswer, onSubmitted, showAnswer = false }: CardStudyProps) {
-  const [userAnswer, setUserAnswer] = useState('');
-  const [isSubmitted, setIsSubmitted] = useState(false);
-  const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [showResult, setShowResult] = useState(false);
-  const [isFlipped, setIsFlipped] = useState(false);
+interface CardState {
+  selectedChoice: string | null;
+  isSubmitted: boolean;
+  isCorrect: boolean | null;
+  showResult: boolean;
+}
+
+type CardAction = { type: "RESET" } | { type: "SELECT"; choice: string; isCorrect: boolean };
+
+function cardReducer(state: CardState, action: CardAction): CardState {
+  switch (action.type) {
+    case "RESET":
+      return {
+        selectedChoice: null,
+        isSubmitted: false,
+        isCorrect: null,
+        showResult: false,
+      };
+    case "SELECT":
+      return {
+        selectedChoice: action.choice,
+        isSubmitted: true,
+        isCorrect: action.isCorrect,
+        showResult: true,
+      };
+    default:
+      return state;
+  }
+}
+
+export default function CardStudy({ card, onAnswer, onSubmitted }: CardStudyProps) {
+  const [state, dispatch] = useReducer(cardReducer, {
+    selectedChoice: null,
+    isSubmitted: false,
+    isCorrect: null,
+    showResult: false,
+  });
+  const prevCardIdRef = useRef<string>(card.id);
 
   useEffect(() => {
-    // Reset when card changes
-    setUserAnswer('');
-    setIsSubmitted(false);
-    setIsCorrect(null);
-    setShowResult(false);
-    setIsFlipped(false);
-    onSubmitted?.(false);
+    // Reset state when card.id changes
+    if (prevCardIdRef.current !== card.id) {
+      prevCardIdRef.current = card.id;
+      dispatch({ type: "RESET" });
+      onSubmitted?.(false);
+    }
   }, [card.id, onSubmitted]);
 
-  const handleSubmit = () => {
-    if (!userAnswer.trim() && card.type !== 'ox') {
-      return;
-    }
+  const handleChoiceClick = (choiceIndex: number) => {
+    if (state.isSubmitted) return;
 
-    let correct = false;
+    const choiceNumber = String(choiceIndex + 1);
+    const correct = card.answer === choiceNumber;
 
-    if (card.type === 'ox') {
-      // O/X 타입은 이미 버튼 클릭으로 처리됨
-      return;
-    } else if (card.type === 'blank') {
-      correct = checkBlankAnswer(userAnswer, card.answer, card.question);
-    } else {
-      // short (단답형)
-      correct = checkAnswer(userAnswer, card.answer);
-    }
-
-    setIsCorrect(correct);
-    setIsSubmitted(true);
-    setIsFlipped(true);
-    setShowResult(true);
+    dispatch({ type: "SELECT", choice: choiceNumber, isCorrect: correct });
     onSubmitted?.(true);
     onAnswer(correct);
-  };
-
-  const handleOXClick = (selected: 'O' | 'X') => {
-    const correct = card.answer.trim().toUpperCase() === selected;
-    setIsCorrect(correct);
-    setIsSubmitted(true);
-    setIsFlipped(true);
-    setShowResult(true);
-    onSubmitted?.(true);
-    onAnswer(correct);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isSubmitted) {
-      handleSubmit();
-    }
   };
 
   return (
     <div className="w-full max-w-2xl mx-auto">
       <div
         className={`bg-white rounded-lg shadow-lg p-6 md:p-8 transition-all duration-300 ${
-          showResult
-            ? isCorrect
-              ? 'border-4 border-green-500 scale-105'
-              : 'border-4 border-red-500 scale-105'
-            : 'border-2 border-gray-200'
+          state.showResult
+            ? state.isCorrect
+              ? "border-4 border-green-500 scale-105"
+              : "border-4 border-red-500 scale-105"
+            : "border-2 border-gray-200"
         }`}
       >
         {/* Question */}
@@ -88,103 +88,75 @@ export default function CardStudy({ card, onAnswer, onSubmitted, showAnswer = fa
           </div>
         </div>
 
-        {/* Answer Input/Display */}
-        {card.type === 'ox' ? (
-          <div className="flex gap-4 justify-center mb-6">
-            <button
-              onClick={() => handleOXClick('O')}
-              disabled={isSubmitted}
-              className={`px-8 py-4 text-2xl font-bold rounded-lg transition-all ${
-                isSubmitted && isCorrect && card.answer.trim().toUpperCase() === 'O'
-                  ? 'bg-green-500 text-white'
-                  : isSubmitted && !isCorrect && card.answer.trim().toUpperCase() === 'O'
-                  ? 'bg-red-500 text-white'
-                  : isSubmitted
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-500 hover:bg-blue-600 text-white cursor-pointer'
-              }`}
-            >
-              O
-            </button>
-            <button
-              onClick={() => handleOXClick('X')}
-              disabled={isSubmitted}
-              className={`px-8 py-4 text-2xl font-bold rounded-lg transition-all ${
-                isSubmitted && isCorrect && card.answer.trim().toUpperCase() === 'X'
-                  ? 'bg-green-500 text-white'
-                  : isSubmitted && !isCorrect && card.answer.trim().toUpperCase() === 'X'
-                  ? 'bg-red-500 text-white'
-                  : isSubmitted
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-red-500 hover:bg-red-600 text-white cursor-pointer'
-              }`}
-            >
-              X
-            </button>
-          </div>
-        ) : card.type === 'blank' ? (
-          <div className="mb-6">
-            <input
-              type="text"
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isSubmitted}
-              placeholder="정답을 입력하세요"
-              className={`w-full px-4 py-3 text-lg border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                isSubmitted
-                  ? isCorrect
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-red-500 bg-red-50'
-                  : 'border-gray-300 focus:border-blue-500'
-              }`}
-            />
-            {!isSubmitted && (
+        {/* Multiple Choice Options */}
+        <div className="space-y-3 mb-6">
+          {card.choices.map((choice, index) => {
+            const choiceNumber = String(index + 1);
+            const isSelected = state.selectedChoice === choiceNumber;
+            const isCorrectAnswer = card.answer === choiceNumber;
+
+            let buttonClass = "";
+            if (state.isSubmitted) {
+              if (isCorrectAnswer) {
+                buttonClass = "bg-green-500 text-white border-green-600";
+              } else if (isSelected && !isCorrectAnswer) {
+                buttonClass = "bg-red-500 text-white border-red-600";
+              } else {
+                buttonClass = "bg-gray-100 text-gray-600 border-gray-300";
+              }
+            } else {
+              buttonClass = isSelected
+                ? "bg-blue-500 text-white border-blue-600"
+                : "bg-white text-gray-800 border-gray-300 hover:border-blue-400 hover:bg-blue-50";
+            }
+
+            return (
               <button
-                onClick={handleSubmit}
-                className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition-colors"
+                key={index}
+                onClick={() => handleChoiceClick(index)}
+                disabled={state.isSubmitted}
+                className={`w-full text-left px-6 py-4 rounded-lg border-2 transition-all ${buttonClass} ${
+                  state.isSubmitted ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
               >
-                제출
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                      state.isSubmitted && isCorrectAnswer
+                        ? "bg-green-600 text-white"
+                        : state.isSubmitted && isSelected && !isCorrectAnswer
+                        ? "bg-red-600 text-white"
+                        : isSelected
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-200 text-gray-700"
+                    }`}
+                  >
+                    {index + 1}
+                  </span>
+                  <span className="flex-1">{choice}</span>
+                  {state.isSubmitted && isCorrectAnswer && (
+                    <span className="text-green-600 font-bold">✓</span>
+                  )}
+                  {state.isSubmitted && isSelected && !isCorrectAnswer && (
+                    <span className="text-red-600 font-bold">✗</span>
+                  )}
+                </div>
               </button>
-            )}
-          </div>
-        ) : (
-          <div className="mb-6">
-            <input
-              type="text"
-              value={userAnswer}
-              onChange={(e) => setUserAnswer(e.target.value)}
-              onKeyPress={handleKeyPress}
-              disabled={isSubmitted}
-              placeholder="답을 입력하세요"
-              className={`w-full px-4 py-3 text-lg border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                isSubmitted
-                  ? isCorrect
-                    ? 'border-green-500 bg-green-50'
-                    : 'border-red-500 bg-red-50'
-                  : 'border-gray-300 focus:border-blue-500'
-              }`}
-            />
-            {!isSubmitted && (
-              <button
-                onClick={handleSubmit}
-                className="mt-4 w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 rounded-lg transition-colors"
-              >
-                제출
-              </button>
-            )}
-          </div>
-        )}
+            );
+          })}
+        </div>
 
         {/* Result Display */}
-        {showResult && (
+        {state.showResult && (
           <div
             className={`mt-6 p-4 rounded-lg ${
-              isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+              state.isCorrect
+                ? "bg-green-50 border border-green-200"
+                : "bg-red-50 border border-red-200"
             }`}
           >
             <div className="flex items-center gap-2 mb-2">
-              {isCorrect ? (
+              {state.isCorrect ? (
                 <>
                   <span className="text-2xl">✓</span>
                   <span className="text-lg font-semibold text-green-700">정답입니다!</span>
@@ -196,10 +168,18 @@ export default function CardStudy({ card, onAnswer, onSubmitted, showAnswer = fa
                 </>
               )}
             </div>
-            {!isCorrect && (
+            {!state.isCorrect && (
               <div className="text-gray-700 mt-2">
-                <div className="font-medium">정답:</div>
-                <div className="text-lg">{card.answer}</div>
+                <div className="font-medium">정답: {card.answer}번</div>
+                <div className="text-lg mt-1">{card.choices[parseInt(card.answer) - 1]}</div>
+              </div>
+            )}
+            {card.explanation && (
+              <div className="mt-4 pt-4 border-t border-gray-300">
+                <div className="font-semibold text-gray-800 mb-2">💡 해설</div>
+                <div className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                  {card.explanation}
+                </div>
               </div>
             )}
           </div>
@@ -208,4 +188,3 @@ export default function CardStudy({ card, onAnswer, onSubmitted, showAnswer = fa
     </div>
   );
 }
-

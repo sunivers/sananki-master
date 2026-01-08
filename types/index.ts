@@ -1,10 +1,12 @@
-export type CardType = "ox" | "blank" | "short";
+export type CardType = "multiple_choice";
 
 export interface Card {
   id: string;
   category: string;
   question: string;
-  answer: string;
+  answer: string; // 정답 번호 (1, 2, 3, 4)
+  choices: string[]; // 선택지 배열 (4개)
+  explanation?: string; // 해설
   type: CardType;
   source?: string;
   created_at?: string;

@@ -4,7 +4,9 @@ CREATE TABLE IF NOT EXISTS cards (
   category TEXT NOT NULL,
   question TEXT NOT NULL,
   answer TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('ox', 'blank', 'short')),
+  choices JSONB NOT NULL, -- 선택지 배열 (4개)
+  explanation TEXT, -- 해설
+  type TEXT NOT NULL CHECK (type IN ('multiple_choice')),
   source TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
