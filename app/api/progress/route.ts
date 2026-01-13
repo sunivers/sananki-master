@@ -4,7 +4,7 @@ import { isSupabaseConfigured } from '@/lib/utils/sample-data';
 
 export async function POST(request: Request) {
   try {
-    const { cardId, isCorrect } = await request.json();
+    const { cardId, isCorrect, currentIndex, isAdditionalStudy } = await request.json();
     
     if (!cardId || typeof isCorrect !== 'boolean') {
       return NextResponse.json(
@@ -13,7 +13,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const progress = await updateCardProgress(cardId, isCorrect);
+    const progress = await updateCardProgress(
+      cardId, 
+      isCorrect, 
+      currentIndex, 
+      isAdditionalStudy
+    );
     return NextResponse.json({ 
       progress,
       isSampleMode: !isSupabaseConfigured(),

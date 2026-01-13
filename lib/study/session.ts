@@ -1,9 +1,9 @@
 import { Card, StudySession } from '@/types';
 
-export function createStudySession(cards: Card[]): StudySession {
+export function createStudySession(cards: Card[], initialIndex: number = 0): StudySession {
   return {
     cards,
-    currentIndex: 0,
+    currentIndex: Math.max(0, Math.min(initialIndex, cards.length - 1)),
     results: new Map(),
     startTime: new Date(),
   };

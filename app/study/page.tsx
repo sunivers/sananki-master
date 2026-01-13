@@ -22,9 +22,14 @@ export default function StudyPage() {
   const [loading, setLoading] = useState(true);
   const [autoNextTimer, setAutoNextTimer] = useState<NodeJS.Timeout | null>(null);
   const [isCardSubmitted, setIsCardSubmitted] = useState(false);
+  const [isAdditionalStudy, setIsAdditionalStudy] = useState(false);
 
   useEffect(() => {
-    loadSession();
+    // URL 파라미터에서 additional 확인
+    const params = new URLSearchParams(window.location.search);
+    const additional = params.get('additional') === 'true';
+    setIsAdditionalStudy(additional);
+    loadSession(additional);
   }, []);
 
   useEffect(() => {
@@ -36,10 +41,11 @@ export default function StudyPage() {
     };
   }, [autoNextTimer]);
 
-  const loadSession = async () => {
+  const loadSession = async (additional: boolean = false) => {
     try {
       setLoading(true);
-      const response = await fetch('/api/study');
+      const url = additional ? '/api/study?additional=true' : '/api/study';
+      const response = await fetch(url);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || 'Failed to load study session');
@@ -51,7 +57,9 @@ export default function StudyPage() {
         return;
       }
       setCards(data.cards);
-      const newSession = createStudySession(data.cards);
+      // 저장된 currentIndex로 세션 복원 (이미 풀었던 카드는 건너뛰기)
+      const savedIndex = data.currentIndex || 0;
+      const newSession = createStudySession(data.cards, savedIndex);
       setSession(newSession);
     } catch (error) {
       console.error('Error loading session:', error);
@@ -72,7 +80,7 @@ export default function StudyPage() {
     recordResult(session, currentCard.id, isCorrect);
     setSession({ ...session });
 
-    // Update progress in database
+    // Update progress in database (currentIndex 포함)
     try {
       await fetch('/api/progress', {
         method: 'POST',
@@ -82,6 +90,8 @@ export default function StudyPage() {
         body: JSON.stringify({
           cardId: currentCard.id,
           isCorrect,
+          currentIndex: session.currentIndex,
+          isAdditionalStudy: isAdditionalStudy,
         }),
       });
     } catch (error) {
@@ -115,7 +125,8 @@ export default function StudyPage() {
     if (!hasMore || isComplete(session)) {
       // All cards completed
       const incorrectIds = getIncorrectCards(session);
-      router.push(`/complete?incorrect=${incorrectIds.length}`);
+      const additionalParam = isAdditionalStudy ? '&additional=true' : '';
+      router.push(`/complete?incorrect=${incorrectIds.length}${additionalParam}`);
     }
   };
 
@@ -165,7 +176,9 @@ export default function StudyPage() {
           >
             <span className="mr-2">←</span> 메인으로
           </button>
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">오늘의 학습</h1>
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">
+            {isAdditionalStudy ? '추가 학습' : '오늘의 학습'}
+          </h1>
           <ProgressBar current={progress.current} total={progress.total} />
         </div>
 

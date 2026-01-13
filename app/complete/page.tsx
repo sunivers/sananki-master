@@ -8,17 +8,26 @@ function CompleteContent() {
   const searchParams = useSearchParams();
   const [incorrectCount, setIncorrectCount] = useState(0);
   const [isReview, setIsReview] = useState(false);
+  const [isAdditionalStudy, setIsAdditionalStudy] = useState(false);
 
   useEffect(() => {
     const incorrect = searchParams.get('incorrect');
     const review = searchParams.get('review');
+    const additional = searchParams.get('additional');
     if (incorrect) {
       setIncorrectCount(parseInt(incorrect, 10));
     }
     if (review === 'true') {
       setIsReview(true);
     }
+    if (additional === 'true') {
+      setIsAdditionalStudy(true);
+    }
   }, [searchParams]);
+
+  const handleAdditionalStudy = () => {
+    router.push('/study?additional=true');
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
@@ -59,6 +68,14 @@ function CompleteContent() {
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"
             >
               오답 복습하기
+            </button>
+          )}
+          {!isReview && !isAdditionalStudy && (
+            <button
+              onClick={handleAdditionalStudy}
+              className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+            >
+              추가 학습하기 (10개)
             </button>
           )}
         </div>

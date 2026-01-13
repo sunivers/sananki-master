@@ -7,10 +7,14 @@ import {
   getMockProgress,
   getMockIncorrectCards,
 } from '@/lib/utils/mock-storage';
+import { getKSTDateString } from '@/lib/utils/kst-date';
+import { updateSessionProgress } from './sessions';
 
 export async function updateCardProgress(
   cardId: string,
-  isCorrect: boolean
+  isCorrect: boolean,
+  currentIndex?: number,
+  isAdditionalStudy?: boolean
 ): Promise<CardProgress | null> {
   if (!isSupabaseConfigured()) {
     // Use mock storage
@@ -84,6 +88,23 @@ export async function updateCardProgress(
       return null;
     }
 
+    // 세션 진행 상황 업데이트 (currentIndex가 제공된 경우)
+    if (currentIndex !== undefined) {
+      const { loadSessionState } = await import('./sessions');
+      const sessionState = await loadSessionState(isAdditionalStudy || false);
+      if (sessionState) {
+        const newCompletedCards = Math.max(
+          sessionState.completedCards,
+          currentIndex + 1
+        );
+        await updateSessionProgress(
+          currentIndex + 1,
+          newCompletedCards,
+          isAdditionalStudy || false
+        );
+      }
+    }
+
     return data as CardProgress;
   } else {
     // Create new progress
@@ -117,6 +138,23 @@ export async function updateCardProgress(
     if (error) {
       console.error('Error creating card progress:', error);
       return null;
+    }
+
+    // 세션 진행 상황 업데이트 (currentIndex가 제공된 경우)
+    if (currentIndex !== undefined) {
+      const { loadSessionState } = await import('./sessions');
+      const sessionState = await loadSessionState(isAdditionalStudy || false);
+      if (sessionState) {
+        const newCompletedCards = Math.max(
+          sessionState.completedCards,
+          currentIndex + 1
+        );
+        await updateSessionProgress(
+          currentIndex + 1,
+          newCompletedCards,
+          isAdditionalStudy || false
+        );
+      }
     }
 
     return data as CardProgress;
@@ -171,6 +209,24 @@ export async function getTodayStats(): Promise<{
   remainingCards: number;
 }> {
   if (!isSupabaseConfigured()) {
+    // In sample mode, check localStorage for session state
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('sananki_session_state');
+      if (stored) {
+        try {
+          const sessionState = JSON.parse(stored);
+          if (sessionState.date === getKSTDateString() && !sessionState.is_additional_study) {
+            return {
+              totalCards: sessionState.total_cards || 0,
+              completedCards: sessionState.completed_cards || 0,
+              remainingCards: (sessionState.total_cards || 0) - (sessionState.completed_cards || 0),
+            };
+          }
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
+    }
     // In sample mode, always return 30 cards
     const todayCards = await import('./cards').then(m => m.getTodayCards(30));
     return {
@@ -190,13 +246,15 @@ export async function getTodayStats(): Promise<{
     };
   }
 
-  const today = new Date().toISOString().split('T')[0];
+  // 한국 시간 기준 날짜 사용
+  const today = getKSTDateString();
 
-  // Get today's session
+  // Get today's session (일반 학습만, 추가 학습 제외)
   const { data: session } = await supabase
     .from('daily_sessions')
     .select('*')
     .eq('date', today)
+    .eq('is_additional_study', false)
     .single();
 
   if (session) {

@@ -27,6 +27,9 @@ export interface DailySession {
   date: string;
   total_cards: number;
   completed_cards: number;
+  card_ids?: string[]; // 오늘의 학습 카드 ID 배열
+  current_index?: number; // 현재 진행 중인 카드 인덱스
+  is_additional_study?: boolean; // 추가 학습 여부
   created_at?: string;
 }
 
